@@ -28,6 +28,7 @@
     "vitest": "^4.1.7"
   },
   "dependencies": {
+    "@complete-web-template/auth": "workspace:*",
     "@complete-web-template/db": "workspace:*",
     "@trpc/server": "^11.17.0",
     "zod": "^4.4.3"

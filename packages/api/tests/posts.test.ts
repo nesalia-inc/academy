@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestContext } from "./helpers";
+import { createAuthTestContext } from "./helpers";
 
 describe("post.list", () => {
-  let ctx: Awaited<ReturnType<typeof createTestContext>>;
+  let ctx: Awaited<ReturnType<typeof createAuthTestContext>>;
 
   beforeAll(async () => {
-    ctx = await createTestContext();
+    ctx = await createAuthTestContext();
   });
 
   afterAll(async () => {
@@ -112,10 +112,10 @@ describe("post.list", () => {
 });
 
 describe("post.byId", () => {
-  let ctx: Awaited<ReturnType<typeof createTestContext>>;
+  let ctx: Awaited<ReturnType<typeof createAuthTestContext>>;
 
   beforeAll(async () => {
-    ctx = await createTestContext();
+    ctx = await createAuthTestContext();
   });
 
   afterAll(async () => {
@@ -152,10 +152,10 @@ describe("post.byId", () => {
 });
 
 describe("post.create", () => {
-  let ctx: Awaited<ReturnType<typeof createTestContext>>;
+  let ctx: Awaited<ReturnType<typeof createAuthTestContext>>;
 
   beforeAll(async () => {
-    ctx = await createTestContext();
+    ctx = await createAuthTestContext();
   });
 
   afterAll(async () => {

@@ -5,60 +5,41 @@ import { bearer } from "better-auth/plugins/bearer";
 import { deviceAuthorization } from "better-auth/plugins/device-authorization";
 import { db, user, session, account, verification, apikey, deviceCode } from "@complete-web-template/db";
 
-// Lazy singleton - auth is only created when first accessed
-let authInstance: ReturnType<typeof createAuth> | null = null;
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
 
-function createAuth() {
-  const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL;
-  const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
-  const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
-
-  return betterAuth({
-    database: drizzleAdapter(db, {
-      provider: "pg",
-      schema: {
-        user,
-        session,
-        account,
-        verification,
-        apikey,
-        deviceCode,
-      },
-    }),
-    emailAndPassword: { enabled: true },
-    socialProviders: {
-      github: {
-        clientId: GITHUB_CLIENT_ID ?? "",
-        clientSecret: GITHUB_CLIENT_SECRET ?? "",
-      },
+export const auth = betterAuth({
+  baseURL: BASE_URL || "http://localhost:3000",
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: {
+      user,
+      session,
+      account,
+      verification,
+      apikey,
+      deviceCode,
     },
-    plugins: [
-      apiKey({
-        enableSessionForAPIKeys: true,
-      }),
-      bearer(),
-      deviceAuthorization({
-        expiresIn: "30m",
-        interval: "5s",
-        verificationUri:
-          (BETTER_AUTH_URL || "http://localhost:3000") + "/device",
-      }),
-    ],
-  });
-}
-
-export function getAuth() {
-  if (!authInstance) {
-    authInstance = createAuth();
-  }
-  return authInstance;
-}
-
-// For backward compatibility - use getAuth() instead
-export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
-  get(_target, prop) {
-    return getAuth()[prop as keyof ReturnType<typeof createAuth>];
+  }),
+  emailAndPassword: { enabled: true },
+  socialProviders: {
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID ?? "",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+    },
   },
+  plugins: [
+    apiKey({
+      enableSessionForAPIKeys: true,
+      apiKeyHeaders: ["x-api-key"],
+    }),
+    deviceAuthorization({
+      schema: {},
+      expiresIn: "30m",
+      interval: "5s",
+      userCodeLength: 8,
+      deviceCodeLength: 40,
+      verificationUri: (BASE_URL || "http://localhost:3000") + "/device",
+    }),
+    bearer(),
+  ],
 });
-
-export type Auth = ReturnType<typeof createAuth>;

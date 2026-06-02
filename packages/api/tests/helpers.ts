@@ -18,56 +18,34 @@ export interface TestContext {
 
 /**
  * Creates a fresh test context with PGlite + tRPC caller.
- * Each call creates a new in-memory database.
+ * Creates an AUTHENTICATED session for testing protected procedures.
  *
  * @example
  * ```typescript
- * const { caller, db, pg } = await createTestContext();
- *
- * // Use caller directly - no HTTP needed
- * const posts = await caller.post.list({ limit: 10 });
- *
- * // Clean up
+ * const { caller, db, pg } = await createAuthTestContext();
+ * // caller.post.list() works because session.userId is defined
  * await pg.close();
  * ```
  */
-export async function createTestContext(): Promise<TestContext> {
-  // 1. Start PGlite in-memory database
-  const pg = new PGlite();
-  await pg.waitReady;
-
-  // 2. Create drizzle instance
-  const db = drizzle(pg);
-
-  // 3. Run migrations
-  await migrate(db, { migrationsFolder: MIGRATIONS_PATH });
-
-  // 4. Create tRPC caller with injected db
-  const createCaller = createCallerFactory(appRouter);
-  const caller = createCaller({ db, authHeader: null });
-
-  return { pg, db, caller };
-}
-
-/**
- * Helper to create a test context with auth header.
- *
- * @example
- * ```typescript
- * const { caller } = await createAuthenticatedContext("Bearer test-token");
- * ```
- */
-export async function createAuthenticatedContext(
-  authHeader: string
-): Promise<TestContext> {
+export async function createAuthTestContext(): Promise<TestContext> {
   const pg = new PGlite();
   await pg.waitReady;
 
   const db = drizzle(pg);
   await migrate(db, { migrationsFolder: MIGRATIONS_PATH });
 
+  // Authenticated session - userId is defined so protected procedures pass
+  const mockSession = {
+    id: "test-session-id",
+    userId: "test-user-id",
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    token: "test-token",
+    ipAddress: "127.0.0.1" as string | null,
+    userAgent: "test" as string | null,
+  };
+
   const createCaller = createCallerFactory(appRouter);
-  const caller = createCaller({ db, authHeader });
+  const caller = createCaller({ db, session: mockSession });
 
   return { pg, db, caller };
 }

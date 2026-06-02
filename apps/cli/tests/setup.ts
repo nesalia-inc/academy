@@ -13,13 +13,13 @@ export let tempDir: { configPath: string; cleanup: () => void };
 beforeAll(async () => {
   // Create temp directory for config storage
   tempDir = createTempDir();
-  process.env.CWT_CONFIG_PATH = tempDir.configPath;
+  process.env.CLI_AUTH_CONFIG_PATH = tempDir.configPath;
 
   // Start test server with auth
   testServer = await createTestServerWithAuth();
 
   // Set API URL for CLI
-  process.env.CWT_API_URL = testServer.baseUrl;
+  process.env.CLI_AUTH_API_URL = testServer.baseUrl;
 
   // Mock open to prevent browser launching
   mockOpen();
@@ -32,8 +32,8 @@ afterAll(async () => {
   }
   restoreOpen();
   tempDir.cleanup();
-  delete process.env.CWT_CONFIG_PATH;
-  delete process.env.CWT_API_URL;
+  delete process.env.CLI_AUTH_CONFIG_PATH;
+  delete process.env.CLI_AUTH_API_URL;
 });
 
 // Clean up before each test (reset credentials)

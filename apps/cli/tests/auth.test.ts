@@ -3,6 +3,17 @@ import { status, logout } from "../src/commands/auth";
 import { loadCredentials, clearCredentials, saveCredentials } from "../src/lib/auth/storage";
 import { testServer } from "./setup";
 
+// Mock @clack/prompts before importing auth commands
+vi.mock("@clack/prompts", () => ({
+  log: {
+    info: vi.fn(),
+    success: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    message: vi.fn(),
+  },
+}));
+
 // Mock open before importing device-flow
 vi.mock("../src/lib/auth/device-flow", async () => {
   const actual = await vi.importActual("../src/lib/auth/device-flow");
@@ -45,19 +56,18 @@ describe("CLI Auth Commands", () => {
 
   describe("status", () => {
     it("should show not logged in message when no credentials", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const { log } = await import("@clack/prompts");
       clearCredentials();
 
       await status();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "  Not logged in. Run 'auth login' to authenticate."
+      expect(log.info).toHaveBeenCalledWith(
+        "Not logged in. Run 'auth login' to authenticate."
       );
-      consoleSpy.mockRestore();
     });
 
     it("should show logged in message when credentials exist", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const { log } = await import("@clack/prompts");
 
       // Simulate logged in state
       saveCredentials({
@@ -77,27 +87,25 @@ describe("CLI Auth Commands", () => {
 
       await status();
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(log.success).toHaveBeenCalledWith(
         expect.stringContaining("Test User")
       );
-      consoleSpy.mockRestore();
       vi.unstubAllGlobals();
     });
   });
 
   describe("logout", () => {
     it("should show not logged in when no credentials", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const { log } = await import("@clack/prompts");
       clearCredentials();
 
       await logout();
 
-      expect(consoleSpy).toHaveBeenCalledWith("  Not logged in.");
-      consoleSpy.mockRestore();
+      expect(log.info).toHaveBeenCalledWith("Not logged in.");
     });
 
     it("should clear credentials and confirm logout", async () => {
-      const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const { log } = await import("@clack/prompts");
 
       // Set up credentials
       saveCredentials({
@@ -108,9 +116,8 @@ describe("CLI Auth Commands", () => {
 
       await logout();
 
-      expect(consoleSpy).toHaveBeenCalledWith("  Successfully logged out.");
+      expect(log.success).toHaveBeenCalledWith("Successfully logged out.");
       expect(loadCredentials() ?? null).toBeNull();
-      consoleSpy.mockRestore();
     });
   });
 });

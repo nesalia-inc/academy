@@ -19,7 +19,7 @@ export const baseProcedure = t.procedure;
 export const publicProcedure = t.procedure;
 
 const isAuthedMiddleware = t.middleware(({ ctx, next }) => {
-  if (!ctx.authHeader) {
+  if (ctx.session === null || ctx.session?.userId === undefined) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
       message: 'You must be logged in',
@@ -30,9 +30,9 @@ const isAuthedMiddleware = t.middleware(({ ctx, next }) => {
   });
 });
 
-// Cast to any to avoid TS2883 - inferred type references db package internals
-// Runtime behavior is correct; this is a module resolution artifact
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export const protectedProcedure = t.procedure.use(isAuthedMiddleware) as any;
+// Cast to any to bypass TypeScript inference limitation with middleware-chained procedures.
+// The middleware is correctly applied at runtime; this is purely a type system artifact.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const protectedProcedure: typeof publicProcedure = t.procedure.use(isAuthedMiddleware) as any;
 
 export const adminProcedure = () => protectedProcedure;

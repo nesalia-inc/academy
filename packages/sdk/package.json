@@ -19,11 +19,8 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@better-auth/api-key": "^1.6.11",
     "@complete-web-template/api": "workspace:*",
-    "@complete-web-template/test-utils": "workspace:*",
-    "@trpc/client": "^11.17.0",
-    "better-auth": "^1.6.11"
+    "@trpc/client": "^11.17.0"
   },
   "devDependencies": {
     "@complete-web-template/test-utils": "workspace:*",

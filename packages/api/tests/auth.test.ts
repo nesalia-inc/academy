@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestContext, createAuthenticatedContext } from "./helpers";
+import { createAuthTestContext } from "./helpers";
 
 describe("Middleware", () => {
   it("should work with authenticated context", async () => {
-    const { caller, pg } = await createAuthenticatedContext("Bearer test-token");
+    const { caller, pg } = await createAuthTestContext();
 
     const result = await caller.post.list();
     expect(result).toBeDefined();
@@ -11,8 +11,8 @@ describe("Middleware", () => {
     await pg.close();
   });
 
-  it("should accept any auth header format", async () => {
-    const { caller, pg } = await createAuthenticatedContext("any-format-works");
+  it("should work with another authenticated session", async () => {
+    const { caller, pg } = await createAuthTestContext();
 
     const result = await caller.post.list();
     expect(result).toBeDefined();
@@ -21,18 +21,18 @@ describe("Middleware", () => {
   });
 });
 
-describe("Auth Header Context", () => {
-  let ctx: Awaited<ReturnType<typeof createTestContext>>;
+describe("Auth Session Context", () => {
+  let ctx: Awaited<ReturnType<typeof createAuthTestContext>>;
 
   beforeAll(async () => {
-    ctx = await createTestContext();
+    ctx = await createAuthTestContext();
   });
 
   afterAll(async () => {
     await ctx.pg.close();
   });
 
-  it("should handle null authHeader", async () => {
+  it("should handle authenticated session", async () => {
     const result = await ctx.caller.post.list();
     expect(result).toBeDefined();
   });

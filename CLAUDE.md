@@ -4,30 +4,68 @@ Always speak in English.
 
 ## Project Overview
 
-This is a monorepo with two main packages:
-- `packages/db` — Drizzle ORM schema and database client (PostgreSQL)
-- `packages/api` — tRPC server built on top of the db package
+This is a monorepo with these core packages:
+
+| Package | Purpose |
+|---------|---------|
+| `packages/auth` | Authentication logic, Better Auth configuration, auth middleware |
+| `packages/db` | Drizzle ORM schema (auth tables + app tables) + database client |
+| `packages/api` | tRPC server — exposes DB operations through typed procedures |
+| `packages/sdk` | Isomorphic TypeScript SDK consumed by CLI and Web |
+| `apps/cli` | Command-line tool (uses SDK) |
+| `apps/web` | Next.js web application (uses SDK) |
+
+## Data Flow
+
+```
+packages/auth          ← Auth logic (Better Auth, device flow, sessions)
+       ↓
+packages/db            ← ALL tables (auth tables + app tables), never elsewhere
+       ↓
+packages/api           ← tRPC procedures using db + auth
+       ↓
+packages/sdk           ← Isomorphic SDK wrapping tRPC
+       ↓
+apps/cli + apps/web    ← Consume SDK
+```
 
 ## Architecture
 
 ```
 packages/
-├── db/               # Schema + Drizzle client (single source of truth for DB)
+├── auth/              # AUTH LAYER — only place for auth logic
+│   └── src/
+│       ├── config.ts      # Better Auth server configuration
+│       ├── index.ts       # Auth exports (session helpers, middleware)
+│       └── ...
+├── db/                # SCHEMA LAYER — ALL tables here, nowhere else
 │   └── src/db/
-│       ├── index.ts  # Drizzle instance + re-exports (lazy singleton for serverless)
+│       ├── index.ts       # Drizzle instance + re-exports
 │       └── schema/
-│           └── index.ts  # ALL table definitions + relations
-└── api/              # tRPC router
+│           └── index.ts   # Auth tables + app tables + relations
+└── api/               # API LAYER — tRPC routers using db + auth
     └── src/
-        ├── context.ts    # Creates tRPC context (session + user lookup)
-        ├── init.ts       # Procedure definitions (public, protected, admin)
-        ├── routers/      # Route handlers
-        └── auth/         # Better Auth configuration
+        ├── context.ts     # Creates tRPC context (session + user lookup)
+        ├── init.ts        # Procedure definitions (public, protected, admin)
+        ├── routers/       # Route handlers
+        └── auth/          # Auth-related tRPC middleware (uses packages/auth)
 ```
 
-## Adding a New Table
+## Database Schema Rules
 
-### 1. Define the table in `packages/db/src/db/schema/index.ts`
+### Location
+- **ALL tables** (auth tables AND app tables) are defined in `packages/db/src/db/schema/index.ts`
+- **No tables** are defined elsewhere — not in `api`, not in `auth`, not in `apps`
+
+### Auth tables vs App tables
+- Auth tables (managed by Better Auth): `user`, `session`, `account`, `verification`
+- App tables: `users`, `posts`, etc. (your application data)
+
+The context (`packages/api/src/context.ts`) bridges them by looking up the `users.role` from the app `users` table using the better-auth user's email.
+
+### Adding a New App Table
+
+1. Define the table in `packages/db/src/db/schema/index.ts`
 
 ```typescript
 export const myTable = pgTable("my_table", {
@@ -47,7 +85,7 @@ export const myTable = pgTable("my_table", {
 - Always include `deletedAt: timestamp("deleted_at")` for soft-delete support
 - Always include `createdAt` and `updatedAt` timestamps
 
-### 2. Define relations (if the table has relationships)
+2. Define relations (if the table has relationships)
 
 ```typescript
 export const myTableRelations = relations(myTable, ({ one, many }) => ({
@@ -56,17 +94,72 @@ export const myTableRelations = relations(myTable, ({ one, many }) => ({
 }));
 ```
 
-### 3. Rebuild the db package
+3. Rebuild the db package
 
 ```bash
 pnpm --filter @complete-web-template/db build
 ```
 
-### 4. Use the table in the API
+4. Use the table in the API
 
 ```typescript
 // In any router
 import { db, myTable, eq } from '@complete-web-template/db';
+```
+
+## Authentication
+
+### Location
+All authentication logic lives in `packages/auth`:
+- Better Auth server configuration (`config.ts`)
+- Auth middleware and helpers
+- Device flow, OAuth callbacks, session management
+
+### API Integration
+The `packages/api` uses `packages/auth` to:
+- Validate sessions in tRPC context
+- Create protected procedures (require authentication)
+- Create admin procedures (require admin role)
+- Handle auth middleware for routes
+
+### SDK Patterns
+The `packages/sdk` exposes auth operations in patterns consumed by:
+- `apps/cli` — device flow auth, token storage
+- `apps/web` — session management, React hooks
+
+## API Layer
+
+### tRPC Procedures
+All API routes are defined in `packages/api/src/routers/`. Each router:
+1. Uses `packages/db` for database access
+2. Uses `packages/auth` for session validation
+3. Exposes procedures via tRPC
+
+### Context Creation
+`packages/api/src/context.ts` creates the tRPC context by:
+1. Getting session from Better Auth (via `packages/auth`)
+2. Looking up user role from the `users` app table
+3. Passing `{ session, user }` to all procedures
+
+## Database Migrations
+
+Migrations are managed with Drizzle Kit CLI at the repo root:
+
+```bash
+# Generate migration from schema changes
+pnpm drizzle-kit generate
+
+# Run migrations
+pnpm drizzle-kit migrate
+
+# Push schema to database (dev only)
+pnpm drizzle-kit push
+
+# Open studio to inspect
+pnpm drizzle-kit studio
+
+# Drop everything (dev only)
+pnpm drizzle-kit drop
 ```
 
 ## Key Conventions
@@ -91,27 +184,8 @@ The `db` export in `@complete-web-template/db` is a lazy singleton. The Pool is 
 ### Type safety
 - Never cast context user to add fields — extend `createContext` to look up additional data from the `users` table
 - Never import `drizzle-orm` directly in the api package — use re-exports from `@complete-web-template/db`
-
-## Database Migrations
-
-Migrations are managed with Drizzle Kit at the repo root (`drizzle.config.ts`).
-
-```bash
-# Generate migration from schema changes
-pnpm drizzle-kit generate
-
-# Push schema to database (dev)
-pnpm drizzle-kit push
-
-# Open studio to inspect
-pnpm drizzle-kit studio
-```
-
-## Better Auth Integration
-
-Better Auth manages the `user` table (text PK, for auth/sessions). The application-level `users` table (integer PK, for roles/app data) is separate. The context (`packages/api/src/context.ts`) bridges them by looking up the `users.role` from the `users` table using the better-auth user's email.
-
-If you need to extend the better-auth user (e.g., add custom fields), extend the `user` table in the schema — but do not confuse it with the `users` table which is for application-level data.
+- Never put auth logic anywhere except `packages/auth`
+- Never put table definitions anywhere except `packages/db`
 
 ## Running
 
@@ -126,7 +200,6 @@ pnpm build
 pnpm --filter @complete-web-template/api exec tsc --noEmit
 pnpm --filter @complete-web-template/db build
 ```
-
 
 ## Web Search
 

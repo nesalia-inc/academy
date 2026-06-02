@@ -87,6 +87,45 @@ import { eq } from 'drizzle-orm';
 
 Roles (`guest`, `user`, `admin`) are stored in the `users` table, not in Better Auth's user object. The context looks up the role at request time. Do not cast or assume `ctx.user.role` exists — if the user has no entry in the `users` table, `role` will be `null`.
 
+## tRPC Client Setup (Web App)
+
+The tRPC client on the web app must forward session cookies from Better Auth to authenticate requests. This is done by combining `authClient.getCookie()` with the tRPC `httpBatchLink` headers.
+
+```typescript
+// apps/web/trpc/client.ts
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createAuthClient } from "better-auth/client";
+
+const authClient = createAuthClient({ baseURL: "/api/auth" });
+
+export const trpcClient = createTRPCClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: "/api/trpc",
+      headers() {
+        const cookies = authClient.getCookie();
+        if (cookies) {
+          return { Cookie: cookies };
+        }
+        return {};
+      },
+    }),
+  ],
+});
+```
+
+### Why This Pattern?
+
+| Component | Role |
+|-----------|------|
+| `authClient` | Manages session cookies (from Better Auth) |
+| `authClient.getCookie()` | Reads the session cookie from `document.cookie` (browser only) |
+| `httpBatchLink.headers()` | Forwards cookies to tRPC on every request |
+
+The flow: **Browser** → `authClient` (cookie storage) → tRPC **→** `httpBatchLink` (forwards cookies) → **Server tRPC context** → validates session via `auth.api.getSession()`
+
+This pattern keeps auth and data transport separate: Better Auth handles authentication state, tRPC handles business logic.
+
 ## Build
 
 ```bash

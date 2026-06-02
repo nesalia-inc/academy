@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { posts, eq, and, isNull, gt } from '@complete-web-template/db';
-import { publicProcedure, createTRPCRouter } from '../init';
+import { publicProcedure, protectedProcedure, createTRPCRouter } from '../init';
 
 function generateSlug(title: string): string {
   const randomBytes = new Uint8Array(16);
@@ -24,7 +25,7 @@ const paginatedInput = z.object({
 });
 
 export const postRouter = createTRPCRouter({
-  list: publicProcedure
+  list: protectedProcedure
     .input(paginatedInput.optional())
     .query(async ({ input, ctx }) => {
       const limit = input?.limit ?? 20;
@@ -50,7 +51,7 @@ export const postRouter = createTRPCRouter({
       return { items, nextCursor };
     }),
 
-  byId: publicProcedure
+  byId: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input, ctx }) => {
       try {
@@ -64,7 +65,7 @@ export const postRouter = createTRPCRouter({
       }
     }),
 
-  create: publicProcedure
+  create: protectedProcedure
     .input(
       z.object({
         title: z.string().min(1).max(256),
@@ -84,10 +85,11 @@ export const postRouter = createTRPCRouter({
           .returning();
         return result ?? null;
       } catch (err) {
+        console.error('[post.create] DB error:', err);
         if (err instanceof Error && err.message.includes('unique')) {
-          throw new Error('Slug already exists, please choose another');
+          throw new TRPCError({ code: 'CONFLICT', message: 'Slug already exists, please choose another' });
         }
-        throw new Error('Failed to create post');
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to create post' });
       }
     }),
 });

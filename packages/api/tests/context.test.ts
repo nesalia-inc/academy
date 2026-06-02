@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestContext } from "./helpers";
+import { createAuthTestContext } from "./helpers";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
@@ -16,7 +16,6 @@ const MIGRATIONS_PATH = path.resolve(
 describe("Context", () => {
   describe("DB Injection", () => {
     it("should use injected db when provided", async () => {
-      // Create two separate PGlite instances
       const pg1 = new PGlite();
       await pg1.waitReady;
       const db1 = drizzle(pg1);
@@ -27,9 +26,18 @@ describe("Context", () => {
       const db2 = drizzle(pg2);
       await migrate(db2, { migrationsFolder: MIGRATIONS_PATH });
 
+      const mockSession = {
+        id: "test-session-id",
+        userId: "test-user-id",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        token: "test-token",
+        ipAddress: "127.0.0.1" as string | null,
+        userAgent: "test" as string | null,
+      };
+
       const createCaller = createCallerFactory(appRouter);
-      const caller1 = createCaller({ db: db1, authHeader: null });
-      const caller2 = createCaller({ db: db2, authHeader: null });
+      const caller1 = createCaller({ db: db1, session: mockSession });
+      const caller2 = createCaller({ db: db2, session: mockSession });
 
       await caller1.post.create({ title: "Only in DB1" });
 
@@ -43,14 +51,23 @@ describe("Context", () => {
       await pg2.close();
     });
 
-    it("should pass authHeader to context", async () => {
+    it("should work with authenticated session", async () => {
       const pg = new PGlite();
       await pg.waitReady;
       const db = drizzle(pg);
       await migrate(db, { migrationsFolder: MIGRATIONS_PATH });
 
+      const mockSession = {
+        id: "test-session-id",
+        userId: "test-user-id",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        token: "test-token",
+        ipAddress: "127.0.0.1" as string | null,
+        userAgent: "test" as string | null,
+      };
+
       const createCaller = createCallerFactory(appRouter);
-      const caller = createCaller({ db, authHeader: "Bearer my-test-token" });
+      const caller = createCaller({ db, session: mockSession });
 
       const result = await caller.post.list();
       expect(result).toBeDefined();
@@ -60,17 +77,17 @@ describe("Context", () => {
   });
 
   describe("Context Shape", () => {
-    let ctx: Awaited<ReturnType<typeof createTestContext>>;
+    let ctx: Awaited<ReturnType<typeof createAuthTestContext>>;
 
     beforeAll(async () => {
-      ctx = await createTestContext();
+      ctx = await createAuthTestContext();
     });
 
     afterAll(async () => {
       await ctx.pg.close();
     });
 
-    it("should have db and authHeader in context", async () => {
+    it("should have db and session in context", async () => {
       const result = await ctx.caller.post.list();
       expect(result).toHaveProperty("items");
       expect(result).toHaveProperty("nextCursor");

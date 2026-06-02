@@ -159,40 +159,17 @@ export const accountRelations = relations(account, ({ one }) => ({
 }));
 
 // Application tables
-export const users = pgTable("users", {
-  id: integer().primaryKey().generatedAlwaysAsIdentity(),
-  firstName: varchar("first_name", { length: 256 }),
-  lastName: varchar("last_name", { length: 256 }),
-  email: varchar().notNull().unique(),
-  role: rolesEnum().default("guest"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at"),
-  deletedAt: timestamp("deleted_at"),
-}, (table) => [
-  index("users_email_idx").on(table.email),
-]);
 
 export const posts = pgTable("posts", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   slug: varchar({ length: 64 }).notNull().unique(),
   title: varchar({ length: 256 }),
-  ownerId: integer("owner_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at"),
   deletedAt: timestamp("deleted_at"),
 }, (table) => [
   index("posts_deleted_at_idx").on(table.deletedAt),
-  index("posts_owner_id_idx").on(table.ownerId),
   index("posts_slug_idx").on(table.slug),
 ]);
 
-export const usersRelations = relations(users, ({ many }) => ({
-  posts: many(posts),
-}));
-
-export const postsRelations = relations(posts, ({ one }) => ({
-  owner: one(users, {
-    fields: [posts.ownerId],
-    references: [users.id],
-  }),
-}));
+export const postsRelations = relations(posts, ({ one }) => ({}));

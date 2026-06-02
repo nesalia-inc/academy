@@ -1,44 +1,63 @@
 #!/usr/bin/env node
 
-import { login, status, logout } from "./commands/auth.js";
+import { Command } from "commander";
+import { login, status, logout, list, byId, create } from "./commands/index.js";
 
-const args = process.argv.slice(2);
-const command = args[0];
+const program = new Command();
 
-async function main() {
-  switch (command) {
-    case "auth":
-      const subCommand = args[1];
-      switch (subCommand) {
-        case "login":
-          await login();
-          break;
-        case "status":
-          await status();
-          break;
-        case "logout":
-          await logout();
-          break;
-        default:
-          console.log(`Unknown subcommand: ${subCommand}`);
-          break;
-      }
-      break;
-    case "--version":
-    case "-v":
-      console.log("@complete-web-template/cli v1.0.0");
-      break;
-    default:
-      console.log(`
-@complete-web-template/cli v1.0.0
+program
+  .name("cli")
+  .version("1.0.0")
+  .description("@complete-web-template/cli — Manage your account authentication");
 
-Usage:
-  cli auth login      Login via device authorization
-  cli auth status     Check authentication status
-  cli auth logout     Logout and clear credentials
-`);
-      break;
-  }
-}
+program
+  .command("auth", { isDefault: false })
+  .description("Authentication commands")
+  .addCommand(
+    new Command("login")
+      .description("Login via device authorization")
+      .action(login),
+  )
+  .addCommand(
+    new Command("status")
+      .description("Check authentication status")
+      .action(status),
+  )
+  .addCommand(
+    new Command("logout")
+      .description("Logout and clear credentials")
+      .action(logout),
+  );
 
-main().catch(console.error);
+program
+  .command("post")
+  .description("Manage posts")
+  .addCommand(
+    new Command("list")
+      .description("List all posts")
+      .option("--cursor <id>", "Cursor for pagination")
+      .option("--limit <number>", "Number of posts to fetch", "20")
+      .action((cmd) => {
+        list();
+      }),
+  )
+  .addCommand(
+    new Command("by-id")
+      .description("Get a post by ID")
+      .requiredOption("--id <id>", "Post ID")
+      .action(function () {
+        byId({ id: Number(this.opts().id) });
+      }),
+  )
+  .addCommand(
+    new Command("create")
+      .description("Create a new post")
+      .requiredOption("--title <title>", "Post title")
+      .option("--slug <slug>", "Post slug (auto-generated if omitted)")
+      .action(function () {
+        const opts = this.opts();
+        create({ title: opts.title, slug: opts.slug });
+      }),
+  );
+
+program.parse(process.argv);

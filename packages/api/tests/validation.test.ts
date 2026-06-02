@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestContext } from "./helpers";
+import { createAuthTestContext } from "./helpers";
 
 describe("Slug Generation", () => {
-  let ctx: Awaited<ReturnType<typeof createTestContext>>;
+  let ctx: Awaited<ReturnType<typeof createAuthTestContext>>;
 
   beforeAll(async () => {
-    ctx = await createTestContext();
+    ctx = await createAuthTestContext();
   });
 
   afterAll(async () => {
@@ -74,10 +74,10 @@ describe("Slug Generation", () => {
 });
 
 describe("Zod Input Validation", () => {
-  let ctx: Awaited<ReturnType<typeof createTestContext>>;
+  let ctx: Awaited<ReturnType<typeof createAuthTestContext>>;
 
   beforeAll(async () => {
-    ctx = await createTestContext();
+    ctx = await createAuthTestContext();
   });
 
   afterAll(async () => {

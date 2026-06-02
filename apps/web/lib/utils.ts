@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getBaseUrl() {
-  return process.env.BETTER_AUTH_URL || "http://localhost:3000"
+  return process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
 }
 
 export function getAuthUrl() {
