@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo } from "react"
 import { useQueryState } from "nuqs"
 import { parseAsString } from "nuqs"
@@ -23,6 +24,7 @@ import { CheckCircle, Circle, Flame, Search } from "lucide-react"
 
 type Challenge = {
   id: string
+  slug: string
   name: string
   difficulty: "Easy" | "Medium" | "Hard"
   category: string
@@ -30,17 +32,15 @@ type Challenge = {
 }
 
 const challenges: Challenge[] = [
-  { id: "1", name: "Two Sum", difficulty: "Easy", category: "Arrays", status: "completed" },
-  { id: "2", name: "Valid Parentheses", difficulty: "Medium", category: "Strings", status: "in_progress" },
-  { id: "3", name: "Binary Tree Inorder", difficulty: "Easy", category: "Trees", status: "not_started" },
-  { id: "4", name: "LRU Cache", difficulty: "Hard", category: "Arrays", status: "completed" },
-  { id: "5", name: "Reverse Linked List", difficulty: "Easy", category: "Linked Lists", status: "in_progress" },
+  { id: "1", slug: "two-sum", name: "Two Sum", difficulty: "Easy", category: "Arrays", status: "completed" },
+  { id: "2", slug: "valid-parentheses", name: "Valid Parentheses", difficulty: "Medium", category: "Strings", status: "in_progress" },
+  { id: "3", slug: "binary-tree-inorder", name: "Binary Tree Inorder", difficulty: "Easy", category: "Trees", status: "not_started" },
+  { id: "4", slug: "lru-cache", name: "LRU Cache", difficulty: "Hard", category: "Arrays", status: "completed" },
+  { id: "5", slug: "reverse-linked-list", name: "Reverse Linked List", difficulty: "Easy", category: "Linked Lists", status: "in_progress" },
 ]
 
 const categories = ["Arrays", "Strings", "Trees", "Linked Lists"] as const
 const difficulties = ["Easy", "Medium", "Hard"] as const
-type Difficulty = (typeof difficulties)[number]
-type Category = (typeof categories)[number]
 
 const StatusIcon = ({ status }: { status: Challenge["status"] }) => {
   switch (status) {
@@ -62,6 +62,14 @@ const columns: ColumnDef<Challenge>[] = [
   {
     accessorKey: "name",
     header: "Name",
+    cell: ({ row }) => (
+      <Link
+        href={`/challenges/${row.original.slug}/description`}
+        className="hover:text-primary hover:underline"
+      >
+        {row.original.name}
+      </Link>
+    ),
   },
   {
     accessorKey: "difficulty",
@@ -77,7 +85,7 @@ const columns: ColumnDef<Challenge>[] = [
     header: "Category",
     cell: ({ row }) => {
       const cat = row.original.category
-      const color = cat === "Arrays" ? "blue" : cat === "Strings" ? "purple" : cat === "Trees" ? "green" : "pink"
+      const color = cat === "Arrays" ? "blue" : cat === "Strings" ? "green" : cat === "Trees" ? "orange" : "purple"
       return <ColoredBadge color={color}>{cat}</ColoredBadge>
     },
   },
@@ -181,7 +189,7 @@ export function ChallengeTable() {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
+              <TableRow key={row.id} className="cursor-pointer">
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

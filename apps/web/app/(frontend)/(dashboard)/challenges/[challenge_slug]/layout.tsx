@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation"
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
 import { ColoredBadge } from "@/components/challenges/colored-badge"
 import { ChallengeEditorPanel } from "@/components/challenges/challenge-editor-panel"
+import { ThumbsUp, ThumbsDown } from "lucide-react"
+import { useState } from "react"
 
 const challengeTabs = [
   { href: "description", label: "Description" },
@@ -18,6 +20,7 @@ export default function ChallengeLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const [liked, setLiked] = useState<"up" | "down" | null>(null)
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] min-h-0">
@@ -67,6 +70,40 @@ export default function ChallengeLayout({
                   {/* Content */}
                   <div className="flex-1 overflow-auto p-6">
                     {children}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between px-4 py-3 border-t shrink-0">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setLiked(liked === "up" ? null : "up")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+                          liked === "up"
+                            ? "bg-green-500/10 text-green-500"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <ThumbsUp className="size-4" />
+                        <span className="text-sm font-medium">Like</span>
+                      </button>
+                      <button
+                        onClick={() => setLiked(liked === "down" ? null : "down")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+                          liked === "down"
+                            ? "bg-red-500/10 text-red-500"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        <ThumbsDown className="size-4" />
+                        <span className="text-sm font-medium">Dislike</span>
+                      </button>
+                    </div>
+                    <Link
+                      href="/challenges/two-sum/rate"
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Rate this challenge
+                    </Link>
                   </div>
                 </div>
               </ResizablePanel>
