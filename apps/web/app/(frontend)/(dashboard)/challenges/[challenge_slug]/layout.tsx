@@ -73,7 +73,7 @@ export default function ChallengeLayout({
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between px-4 py-3 border-t shrink-0">
+                  <div className="flex items-center justify-between px-4 py-2 border-t shrink-0">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setLiked(liked === "up" ? null : "up")}
