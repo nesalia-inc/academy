@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ModeToggle } from "@/components/headers/mode-toggle"
 
 export function AuthButtons() {
@@ -41,6 +41,12 @@ export function AuthButtons() {
           <DropdownMenuTrigger asChild>
             <Avatar className="cursor-pointer">
               <AvatarFallback>{initials}</AvatarFallback>
+              {session.user?.email && (
+                <AvatarImage
+                  src={`https://vercel.com/api/www/avatar?s=40&u=${encodeURIComponent(session.user.email)}&dpl=dpl_G61Gj1bEoqhEUhb3w2t9wubjKqeY`}
+                  alt={name}
+                />
+              )}
             </Avatar>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

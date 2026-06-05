@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { AppProvider } from "@/components/providers";
 import { AppHeader } from "@/components/headers/app-header";
 import "./globals.css";
@@ -18,7 +19,7 @@ export default function RootLayout({
       <body className="antialiased">
         <AppProvider>
           <AppHeader />
-          {children}
+          <NuqsAdapter>{children}</NuqsAdapter>
         </AppProvider>
       </body>
     </html>
