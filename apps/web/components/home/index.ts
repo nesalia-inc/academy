@@ -1,0 +1,5 @@
+export { Hero } from "./hero"
+export { Features } from "./features"
+export { ParcoursSection } from "./parcours-section"
+export { FAQ } from "./faq"
+export { HomeFooter } from "./home-footer"
