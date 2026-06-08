@@ -8,92 +8,116 @@
 
 Challenge categories (e.g., Arrays, Trees, Dynamic Programming).
 
-```sql
-CREATE TABLE category (
-  id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  name VARCHAR(100) NOT NULL,
-  slug VARCHAR(100) NOT NULL UNIQUE,
-  icon VARCHAR(50),                                -- emoji or icon name
-  color VARCHAR(20),                               -- UI color (e.g., blue, green)
-  description TEXT,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  deleted_at TIMESTAMP                             -- soft-delete
-);
+```typescript
+import { pgTable, integer, varchar, text, timestamp, index } from "drizzle-orm/pg-core";
 
--- Indexes
-CREATE UNIQUE INDEX category_slug_idx ON category(slug);
-CREATE INDEX category_sort_order_idx ON category(sort_order);
+export const category = pgTable("category", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 100 }).notNull(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  icon: varchar("icon", { length: 50 }), // emoji or icon name
+  color: varchar("color", { length: 20 }), // UI color (e.g., blue, green)
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => [
+  index("category_slug_idx").on(table.slug),
+  index("category_sort_order_idx").on(table.sortOrder),
+  index("category_deleted_at_idx").on(table.deletedAt), // soft-delete filter
+]);
 ```
 
 ---
 
 ## Relationships
 
-```
-category ──────────────► challenge
-  id (PK)                 category_id (FK)
-```
+```typescript
+import { relations } from "drizzle-orm";
 
-One category can have many challenges.
+export const categoryRelations = relations(category, ({ one, many }) => ({
+  challenges: many(challenge),
+}));
+```
 
 ---
 
 ## Fields
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| `id` | `INTEGER` | PK, auto-increment | Primary key |
-| `name` | `VARCHAR(100)` | NOT NULL | Display name (e.g., "Arrays") |
-| `slug` | `VARCHAR(100)` | NOT NULL, UNIQUE | URL-friendly name (e.g., "arrays") |
-| `icon` | `VARCHAR(50)` | nullable | Emoji or icon identifier |
-| `color` | `VARCHAR(20)` | nullable | UI color variant |
-| `description` | `TEXT` | nullable | Category description |
-| `sort_order` | `INTEGER` | NOT NULL, DEFAULT 0 | Display ordering |
-| `created_at` | `TIMESTAMP` | NOT NULL | Creation timestamp |
-| `updated_at` | `TIMESTAMP` | NOT NULL | Last update timestamp |
-| `deleted_at` | `TIMESTAMP` | nullable | Soft-delete marker |
+| Field | Type | Drizzle | Description |
+|-------|------|---------|-------------|
+| `id` | `INTEGER` | `.primaryKey().generatedAlwaysAsIdentity()` | Primary key |
+| `name` | `VARCHAR(100)` | `.notNull()` | Display name (e.g., "Arrays") |
+| `slug` | `VARCHAR(100)` | `.notNull().unique()` | URL-friendly name (e.g., "arrays") |
+| `icon` | `VARCHAR(50)` | | Emoji or icon identifier |
+| `color` | `VARCHAR(20)` | | UI color variant |
+| `description` | `TEXT` | | Category description |
+| `sortOrder` | `INTEGER` | `.notNull().default(0)` | Display ordering |
+| `createdAt` | `TIMESTAMP` | `.defaultNow().notNull()` | Creation timestamp |
+| `updatedAt` | `TIMESTAMP` | `.defaultNow().notNull()` | Last update timestamp |
+| `deletedAt` | `TIMESTAMP` | | Soft-delete marker |
 
 ---
 
 ## Seed Data
 
-```sql
-INSERT INTO category (name, slug, icon, color, sort_order) VALUES
-  ('Arrays', 'arrays', '📊', 'blue', 1),
-  ('Strings', 'strings', '🔤', 'green', 2),
-  ('Linked Lists', 'linked-lists', '🔗', 'purple', 3),
-  ('Trees', 'trees', '🌳', 'orange', 4),
-  ('Dynamic Programming', 'dynamic-programming', '📈', 'red', 5),
-  ('Graphs', 'graphs', '🕸️', 'pink', 6);
+```typescript
+import { category } from "./schema";
+
+await db.insert(category).values([
+  { name: "Arrays", slug: "arrays", icon: "📊", color: "blue", sortOrder: 1 },
+  { name: "Strings", slug: "strings", icon: "🔤", color: "green", sortOrder: 2 },
+  { name: "Linked Lists", slug: "linked-lists", icon: "🔗", color: "purple", sortOrder: 3 },
+  { name: "Trees", slug: "trees", icon: "🌳", color: "orange", sortOrder: 4 },
+  { name: "Dynamic Programming", slug: "dynamic-programming", icon: "📈", color: "red", sortOrder: 5 },
+  { name: "Graphs", slug: "graphs", icon: "🕸️", color: "pink", sortOrder: 6 },
+]);
 ```
 
 ---
 
-## Queries
+## Queries (Drizzle)
 
 ### List all active categories
-```sql
-SELECT * FROM category
-WHERE deleted_at IS NULL
-ORDER BY sort_order;
+```typescript
+import { isNull, asc } from "drizzle-orm";
+
+const categories = await db.query.category.findMany({
+  where: isNull(category.deletedAt),
+  orderBy: asc(category.sortOrder),
+});
 ```
 
 ### Get category by slug
-```sql
-SELECT * FROM category
-WHERE slug = $1 AND deleted_at IS NULL;
+```typescript
+import { and, eq, isNull } from "drizzle-orm";
+
+const cat = await db.query.category.findFirst({
+  where: and(
+    eq(category.slug, slug),
+    isNull(category.deletedAt)
+  ),
+});
 ```
 
 ### Get category with challenge count
-```sql
-SELECT
-  c.*,
-  COUNT(ch.id) AS challenge_count
-FROM category c
-LEFT JOIN challenge ch ON ch.category_id = c.id AND ch.deleted_at IS NULL
-WHERE c.deleted_at IS NULL
-GROUP BY c.id
-ORDER BY c.sort_order;
+```typescript
+import { isNull, sql } from "drizzle-orm";
+
+const categoriesWithCount = await db.query.category.findMany({
+  where: isNull(category.deletedAt),
+  with: {
+    challenges: {
+      where: isNull(challenge.deletedAt),
+      columns: { id: true },
+    },
+  },
+});
+
+// Transform to add count
+const result = categoriesWithCount.map(cat => ({
+  ...cat,
+  challengeCount: cat.challenges.length,
+}));
 ```

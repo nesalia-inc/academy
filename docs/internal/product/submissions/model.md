@@ -8,56 +8,69 @@
 
 A submission is a final attempt. Created when user clicks "Submit" (vs "Run").
 
-```sql
-CREATE TABLE submission (
-  id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  exercise_id INTEGER NOT NULL REFERENCES exercise(id),
-  status VARCHAR(50) NOT NULL, -- passed | failed | error | timeout
-  code TEXT,
-  language VARCHAR(20),
-  test_results JSONB,                                 -- per test case results
-  execution_time INTEGER,                             -- ms
-  memory_used FLOAT,                                  -- MB
-  error_message TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  deleted_at TIMESTAMP                               -- soft-delete
-);
+```typescript
+import { pgTable, integer, varchar, text, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { exercise } from "./exercise";
 
--- Indexes
-CREATE INDEX submission_exercise_id_idx ON submission(exercise_id);
-CREATE INDEX submission_created_at_idx ON submission(created_at DESC);
-CREATE INDEX submission_status_idx ON submission(status);
-CREATE INDEX submission_deleted_at_idx ON submission(deleted_at) WHERE deleted_at IS NULL;
+export const submissionStatusEnum = pgEnum("submission_status", [
+  "passed",
+  "failed",
+  "error",
+  "timeout",
+]);
+
+export const submission = pgTable("submission", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  exerciseId: integer("exercise_id").notNull().references(() => exercise.id),
+  status: varchar("status", { length: 50 }).notNull(),
+  code: text("code"),
+  language: varchar("language", { length: 20 }),
+  testResults: jsonb("test_results"), // per test case results
+  executionTime: integer("execution_time"), // ms
+  memoryUsed: integer("memory_used"), // MB (stored as integer)
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => [
+  index("submission_exercise_id_idx").on(table.exerciseId),
+  index("submission_created_at_idx").on(table.createdAt.desc()),
+  index("submission_status_idx").on(table.status),
+  index("submission_deleted_at_idx").on(table.deletedAt), // soft-delete filter
+]);
 ```
 
 ---
 
 ## Relationships
 
-```
-exercise ──────────────► submission
-  id (PK)                 exercise_id (FK)
-```
+```typescript
+import { relations } from "drizzle-orm";
 
-One exercise has many submissions (all attempts).
+export const submissionRelations = relations(submission, ({ one }) => ({
+  exercise: one(exercise, {
+    fields: [submission.exerciseId],
+    references: [exercise.id],
+  }),
+}));
+```
 
 ---
 
 ## Fields
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| `id` | `INTEGER` | PK, auto-increment | Primary key |
-| `exercise_id` | `INTEGER` | NOT NULL, FK | Reference to exercise |
-| `status` | `VARCHAR(50)` | NOT NULL | passed, failed, error, timeout |
-| `code` | `TEXT` | nullable | Submitted code |
-| `language` | `VARCHAR(20)` | nullable | Programming language |
-| `test_results` | `JSONB` | nullable | Per-test results |
-| `execution_time` | `INTEGER` | nullable | Execution time (ms) |
-| `memory_used` | `FLOAT` | nullable | Memory used (MB) |
-| `error_message` | `TEXT` | nullable | Error output |
-| `created_at` | `TIMESTAMP` | NOT NULL | Submission timestamp |
-| `deleted_at` | `TIMESTAMP` | nullable | Soft-delete marker |
+| Field | Type | Drizzle | Description |
+|-------|------|---------|-------------|
+| `id` | `INTEGER` | `.primaryKey().generatedAlwaysAsIdentity()` | Primary key |
+| `exerciseId` | `INTEGER` | `.notNull().references(() => exercise.id)` | Reference to exercise |
+| `status` | `VARCHAR(50)` | `.notNull()` | passed, failed, error, timeout |
+| `code` | `TEXT` | | Submitted code |
+| `language` | `VARCHAR(20)` | | Programming language |
+| `testResults` | `JSONB` | | Per-test results |
+| `executionTime` | `INTEGER` | | Execution time (ms) |
+| `memoryUsed` | `INTEGER` | | Memory used (MB) |
+| `errorMessage` | `TEXT` | | Error output |
+| `createdAt` | `TIMESTAMP` | `.defaultNow().notNull()` | Submission timestamp |
+| `deletedAt` | `TIMESTAMP` | | Soft-delete marker |
 
 ---
 
@@ -74,109 +87,133 @@ One exercise has many submissions (all attempts).
 
 ## Test Results Schema
 
-```json
-{
-  "results": [
-    {
-      "testIndex": 0,
-      "input": [2, 7, 11, 15],
-      "expected": [0, 1],
-      "actual": [0, 1],
-      "passed": true,
-      "executionTime": 1.2,
-      "memoryUsed": 2.1
-    },
-    {
-      "testIndex": 1,
-      "input": [3, 2, 4],
-      "expected": [1, 2],
-      "actual": null,
-      "passed": false,
-      "error": "Time limit exceeded"
-    }
-  ],
-  "summary": {
-    "total": 5,
-    "passed": 3,
-    "failed": 2,
-    "executionTime": 120,
-    "memoryUsed": 8.5
-  }
+```typescript
+interface TestResults {
+  results: Array<{
+    testIndex: number;
+    input: unknown[];
+    expected: unknown;
+    actual: unknown | null;
+    passed: boolean;
+    executionTime: number;
+    memoryUsed: number;
+  }>;
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    executionTime: number;
+    memoryUsed: number;
+  };
 }
 ```
 
 ---
 
-## Queries
+## Queries (Drizzle)
 
 ### Get user's submission history
-```sql
-SELECT s.*, c.title AS challenge_title, c.slug AS challenge_slug
-FROM submission s
-JOIN exercise e ON e.id = s.exercise_id
-JOIN challenge c ON c.id = e.challenge_id
-WHERE e.user_id = $1 AND s.deleted_at IS NULL
-ORDER BY s.created_at DESC
-LIMIT 20;
+```typescript
+import { isNull, desc } from "drizzle-orm";
+
+const history = await db.query.submission.findMany({
+  with: {
+    exercise: {
+      with: {
+        challenge: {
+          columns: { title: true, slug: true },
+        },
+      },
+    },
+  },
+  orderBy: desc(submission.createdAt),
+  limit: 20,
+});
 ```
 
 ### Get latest submission for exercise
-```sql
-SELECT * FROM submission
-WHERE exercise_id = $1 AND deleted_at IS NULL
-ORDER BY created_at DESC
-LIMIT 1;
+```typescript
+import { isNull, desc } from "drizzle-orm";
+
+const latest = await db.query.submission.findFirst({
+  where: and(
+    eq(submission.exerciseId, exerciseId),
+    isNull(submission.deletedAt)
+  ),
+  orderBy: desc(submission.createdAt),
+});
 ```
 
 ### Get submissions by challenge (for analytics)
-```sql
-SELECT
-  s.status,
-  COUNT(*) AS count,
-  AVG(s.execution_time) AS avg_execution_time,
-  AVG(s.memory_used) AS avg_memory_used
-FROM submission s
-JOIN exercise e ON e.id = s.exercise_id
-WHERE e.challenge_id = $1 AND s.deleted_at IS NULL
-GROUP BY s.status;
+```typescript
+import { isNull, sql } from "drizzle-orm";
+
+const analytics = await db.query.submission.findMany({
+  with: {
+    exercise: {
+      columns: { challengeId: true },
+    },
+  },
+  where: and(
+    eq(exercise.challengeId, challengeId),
+    isNull(submission.deletedAt)
+  ),
+});
+
+// Group by status
+const grouped = analytics.reduce((acc, sub) => {
+  acc[sub.status] = (acc[sub.status] || 0) + 1;
+  return acc;
+}, {});
 ```
 
 ### Create submission
-```sql
-INSERT INTO submission (exercise_id, status, code, language, test_results, execution_time, memory_used, error_message)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING *;
+```typescript
+const newSubmission = await db.insert(submission).values({
+  exerciseId,
+  status,
+  code,
+  language,
+  testResults,
+  executionTime,
+  memoryUsed,
+  errorMessage,
+}).returning();
 ```
 
 ### Update challenge stats after submission
-```sql
-UPDATE challenge
-SET
-  acceptance_rate = (
-    SELECT CAST(SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) AS FLOAT)
-    / NULLIF(COUNT(*), 0)
-    FROM submission
-    WHERE exercise_id IN (
-      SELECT id FROM exercise WHERE challenge_id = $1
-    )
-  ),
-  total_attempts = total_attempts + 1,
-  updated_at = NOW()
-WHERE id = $1;
+```typescript
+import { eq, sql } from "drizzle-orm";
+
+await db.update(challenge)
+  .set({
+    acceptanceRate: sql`(
+      SELECT CAST(SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) AS INTEGER)
+      FROM submission
+      WHERE exercise_id IN (
+        SELECT id FROM exercise WHERE challenge_id = ${challengeId}
+      )
+    )`,
+    totalAttempts: sql`total_attempts + 1`,
+    updatedAt: new Date(),
+  })
+  .where(eq(challenge.id, challengeId));
 ```
 
 ### Award XP on passing submission
-```sql
--- Trigger or procedure to award XP
-UPDATE user_profile
-SET
-  xp = xp + CASE
-    WHEN c.difficulty = 'easy' THEN 100
-    WHEN c.difficulty = 'medium' THEN 200
-    WHEN c.difficulty = 'hard' THEN 300
-  END,
-  updated_at = NOW()
-FROM exercise e
-JOIN challenge c ON c.id = e.challenge_id
-WHERE e.id = $1 AND user_profile.id = e.user_id;
+```typescript
+import { eq } from "drizzle-orm";
+
+const xpReward = {
+  easy: 100,
+  medium: 200,
+  hard: 300,
+};
+
+await db.update(userProfile)
+  .set({
+    xp: sql`xp + ${xpReward[difficulty]}`,
+    updatedAt: new Date(),
+  })
+  .where(eq(userProfile.id, userId));
 ```

@@ -8,74 +8,83 @@
 
 The challenge definition. One challenge can have many exercises (one per user attempt).
 
-```sql
-CREATE TABLE challenge (
-  id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-  category_id INTEGER NOT NULL REFERENCES category(id),
-  type VARCHAR(50) NOT NULL DEFAULT 'coding',  -- coding | mcq | fill-blank
-  title VARCHAR(255) NOT NULL,
-  slug VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
-  difficulty VARCHAR(20) NOT NULL, -- easy | medium | hard
-  solution TEXT,                                 -- hidden until solved
-  acceptance_rate FLOAT NOT NULL DEFAULT 0,
-  total_attempts INTEGER NOT NULL DEFAULT 0,
-  starter_code JSONB,                            -- { "solution.js": "...", "tests.js": "..." }
-  test_cases JSONB, -- [{ "input": [...], "output": [...] }]
-  test_timeout INTEGER,                          -- ms
-  time_limit INTEGER,                            -- ms
-  memory_limit INTEGER,                           -- MB
-  languages JSONB,                               -- ["js", "ts", "python"]
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  deleted_at TIMESTAMP                           -- soft-delete
-);
+```typescript
+import { pgTable, integer, varchar, text, timestamp, index, jsonb } from "drizzle-orm/pg-core";
+import { category } from "./category";
 
--- Indexes
-CREATE UNIQUE INDEX challenge_slug_idx ON challenge(slug);
-CREATE INDEX challenge_category_id_idx ON challenge(category_id);
-CREATE INDEX challenge_difficulty_idx ON challenge(difficulty);
-CREATE INDEX challenge_created_at_idx ON challenge(created_at DESC);
-CREATE INDEX challenge_deleted_at_idx ON challenge(deleted_at) WHERE deleted_at IS NULL;
+export const difficultyEnum = pgEnum("difficulty", ["easy", "medium", "hard"]);
+export const challengeTypeEnum = pgEnum("challenge_type", ["coding", "mcq", "fill-blank"]);
+
+export const challenge = pgTable("challenge", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  categoryId: integer("category_id").notNull().references(() => category.id),
+  type: varchar("type", { length: 50 }).notNull().default("coding"),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  difficulty: varchar("difficulty", { length: 20 }).notNull(), // easy | medium | hard
+  solution: text("solution"), // hidden until solved
+  acceptanceRate: integer("acceptance_rate").notNull().default(0), // stored as integer (0-100)
+  totalAttempts: integer("total_attempts").notNull().default(0),
+  starterCode: jsonb("starter_code"), // { "solution.js": "...", "tests.js": "..." }
+  testCases: jsonb("test_cases"), // [{ "input": [...], "output": [...] }]
+  testTimeout: integer("test_timeout"), // ms
+  timeLimit: integer("time_limit"), // ms
+  memoryLimit: integer("memory_limit"), // MB
+  languages: jsonb("languages"), // ["js", "ts", "python"]
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+}, (table) => [
+  index("challenge_slug_idx").on(table.slug),
+  index("challenge_category_id_idx").on(table.categoryId),
+  index("challenge_difficulty_idx").on(table.difficulty),
+  index("challenge_created_at_idx").on(table.createdAt.desc()),
+  index("challenge_deleted_at_idx").on(table.deletedAt), // soft-delete filter
+]);
 ```
 
 ---
 
 ## Relationships
 
-```
-category ──────────────► challenge ──────────────► exercise
-  id (PK)                 category_id (FK)         challenge_id (FK)
-```
+```typescript
+import { relations } from "drizzle-orm";
 
-One category has many challenges.
-One challenge has many exercises (one per user).
+export const challengeRelations = relations(challenge, ({ one, many }) => ({
+  category: one(category, {
+    fields: [challenge.categoryId],
+    references: [category.id],
+  }),
+  exercises: many(exercise),
+}));
+```
 
 ---
 
 ## Fields
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| `id` | `INTEGER` | PK, auto-increment | Primary key |
-| `category_id` | `INTEGER` | NOT NULL, FK | Reference to category |
-| `type` | `VARCHAR(50)` | NOT NULL, DEFAULT 'coding' | Challenge type |
-| `title` | `VARCHAR(255)` | NOT NULL | Display title |
-| `slug` | `VARCHAR(255)` | NOT NULL, UNIQUE | URL-friendly name |
+| Field | Type | Drizzle | Description |
+|-------|------|---------|-------------|
+| `id` | `INTEGER` | `.primaryKey().generatedAlwaysAsIdentity()` | Primary key |
+| `categoryId` | `INTEGER` | `.notNull().references(() => category.id)` | Reference to category |
+| `type` | `VARCHAR(50)` | `.notNull().default("coding")` | Challenge type |
+| `title` | `VARCHAR(255)` | `.notNull()` | Display title |
+| `slug` | `VARCHAR(255)` | `.notNull().unique()` | URL-friendly name |
 | `description` | `TEXT` | | Markdown description |
-| `difficulty` | `VARCHAR(20)` | NOT NULL | easy, medium, or hard |
-| `solution` | `TEXT` | nullable | Hidden solution (unlocked on solve) |
-| `acceptance_rate` | `FLOAT` | NOT NULL, DEFAULT 0 | 0.0 to 1.0 |
-| `total_attempts` | `INTEGER` | NOT NULL, DEFAULT 0 | Total submission count |
-| `starter_code` | `JSONB` | nullable | Initial code files |
-| `test_cases` | `JSONB` | nullable | Test inputs/outputs |
-| `test_timeout` | `INTEGER` | nullable | Per-test timeout (ms) |
-| `time_limit` | `INTEGER` | nullable | Overall time limit (ms) |
-| `memory_limit` | `INTEGER` | nullable | Memory limit (MB) |
-| `languages` | `JSONB` | nullable | Supported languages |
-| `created_at` | `TIMESTAMP` | NOT NULL | Creation timestamp |
-| `updated_at` | `TIMESTAMP` | NOT NULL | Last update timestamp |
-| `deleted_at` | `TIMESTAMP` | nullable | Soft-delete marker |
+| `difficulty` | `VARCHAR(20)` | `.notNull()` | easy, medium, or hard |
+| `solution` | `TEXT` | | Hidden solution (unlocked on solve) |
+| `acceptanceRate` | `INTEGER` | `.notNull().default(0)` | Percentage (0-100) |
+| `totalAttempts` | `INTEGER` | `.notNull().default(0)` | Total submission count |
+| `starterCode` | `JSONB` | | Initial code files |
+| `testCases` | `JSONB` | | Test inputs/outputs |
+| `testTimeout` | `INTEGER` | | Per-test timeout (ms) |
+| `timeLimit` | `INTEGER` | | Overall time limit (ms) |
+| `memoryLimit` | `INTEGER` | | Memory limit (MB) |
+| `languages` | `JSONB` | | Supported languages |
+| `createdAt` | `TIMESTAMP` | `.defaultNow().notNull()` | Creation timestamp |
+| `updatedAt` | `TIMESTAMP` | `.defaultNow().notNull()` | Last update timestamp |
+| `deletedAt` | `TIMESTAMP` | | Soft-delete marker |
 
 ---
 
@@ -83,47 +92,41 @@ One challenge has many exercises (one per user).
 
 ### Type: `coding` (initial)
 
-```json
-{
-  "type": "coding",
-  "starterCode": {
-    "solution.js": "function solve() {\n  // your code\n}",
-    "tests.js": "module.exports = [{ input: 1, output: 2 }]"
-  },
-  "testCases": [
-    { "input": [2, 7, 11, 15], "output": [0, 1] }
-  ],
-  "testTimeout": 5000,
-  "timeLimit": 5000,
-  "memoryLimit": 64,
-  "languages": ["js", "ts", "python"]
-}
+```typescript
+const starterCode = {
+  "solution.js": "function solve() {\n  // your code\n}",
+  "tests.js": "module.exports = [{ input: 1, output: 2 }]"
+};
+
+const testCases = [
+  { input: [2, 7, 11, 15], output: [0, 1] }
+];
 ```
 
 ### Type: `mcq` (future)
 
-```json
-{
-  "type": "mcq",
-  "question": "Which sorting algorithm has O(n log n) average case?",
-  "options": ["Bubble Sort", "Quick Sort", "Linear Search", "Insertion Sort"],
-  "correctOption": 1,
-  "shuffleOptions": true,
-  "explanation": "Quick Sort has O(n log n) average case complexity."
-}
+```typescript
+const mcqData = {
+  type: "mcq",
+  question: "Which sorting algorithm has O(n log n) average case?",
+  options: ["Bubble Sort", "Quick Sort", "Linear Search", "Insertion Sort"],
+  correctOption: 1,
+  shuffleOptions: true,
+  explanation: "Quick Sort has O(n log n) average case complexity."
+};
 ```
 
 ### Type: `fill-blank` (future)
 
-```json
-{
-  "type": "fill-blank",
-  "template": "The time complexity of binary search is O(__).",
-  "blanks": [
-    { "position": 35, "acceptableAnswers": ["log n", "log(n)", "logn", "log₂n"] }
+```typescript
+const fillBlankData = {
+  type: "fill-blank",
+  template: "The time complexity of binary search is O(__).",
+  blanks: [
+    { position: 35, acceptableAnswers: ["log n", "log(n)", "logn", "log₂n"] }
   ],
-  "caseSensitive": false
-}
+  caseSensitive: false
+};
 ```
 
 ---
@@ -138,45 +141,57 @@ One challenge has many exercises (one per user).
 
 ---
 
-## Queries
+## Queries (Drizzle)
 
 ### Get challenge by slug
-```sql
-SELECT * FROM challenge
-WHERE slug = $1 AND deleted_at IS NULL;
+```typescript
+import { and, eq, isNull } from "drizzle-orm";
+
+const challengeData = await db.query.challenge.findFirst({
+  where: and(
+    eq(challenge.slug, slug),
+    isNull(challenge.deletedAt)
+  ),
+});
 ```
 
 ### Daily challenge (most recent)
-```sql
-SELECT * FROM challenge
-WHERE deleted_at IS NULL
-ORDER BY created_at DESC
-LIMIT 1;
+```typescript
+import { isNull, desc } from "drizzle-orm";
+
+const daily = await db.query.challenge.findFirst({
+  where: isNull(challenge.deletedAt),
+  orderBy: desc(challenge.createdAt),
+});
 ```
 
 ### Challenges by category
-```sql
-SELECT * FROM challenge
-WHERE category_id = $1 AND deleted_at IS NULL
-ORDER BY difficulty, title;
+```typescript
+import { and, eq, isNull, asc } from "drizzle-orm";
+
+const challenges = await db.query.challenge.findMany({
+  where: and(
+    eq(challenge.categoryId, categoryId),
+    isNull(challenge.deletedAt)
+  ),
+  orderBy: [asc(challenge.difficulty), asc(challenge.title)],
+});
 ```
 
 ### Update acceptance rate after submission
-```sql
-UPDATE challenge
-SET
-  acceptance_rate = (
-    SELECT CAST(SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) AS FLOAT)
-    / NULLIF(COUNT(*), 0)
-    FROM submission s
-    JOIN exercise e ON e.id = s.exercise_id
-    WHERE e.challenge_id = $1
-  ),
-  total_attempts = (
-    SELECT COUNT(*) FROM submission s
-    JOIN exercise e ON e.id = s.exercise_id
-    WHERE e.challenge_id = $1
-  ),
-  updated_at = NOW()
-WHERE id = $1;
+```typescript
+import { sql } from "drizzle-orm";
+
+await db.update(challenge)
+  .set({
+    acceptanceRate: sql`(
+      SELECT CAST(SUM(CASE WHEN status = 'passed' THEN 1 ELSE 0 END) AS INTEGER)
+      FROM submission s
+      JOIN exercise e ON e.id = s.exercise_id
+      WHERE e.challenge_id = ${challenge.id}
+    )`,
+    totalAttempts: sql`total_attempts + 1`,
+    updatedAt: new Date(),
+  })
+  .where(eq(challenge.id, challengeId));
 ```
