@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { PanelLeft, PanelLeftClose, Play, Terminal as TerminalIcon } from "lucide-react"
 import { FileTreeComponent } from "@/components/challenges/file-tree"
@@ -19,6 +19,12 @@ export function ChallengeEditorPanel() {
     }
     terminalRef.current?.runMock()
   }
+
+  useEffect(() => {
+    const handleTerminalRun = () => handleRun()
+    window.addEventListener("terminal-run", handleTerminalRun)
+    return () => window.removeEventListener("terminal-run", handleTerminalRun)
+  }, [])
 
   return (
     <div className="flex flex-col h-full">

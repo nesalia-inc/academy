@@ -107,6 +107,48 @@ export const ChallengeTerminal = forwardRef<ChallengeTerminalRef>((_, ref) => {
     term.writeln("")
     term.write("\x1b[36m$\x1b[0m ")
 
+    // Handle user input
+    let currentLine = ""
+    term.onData((data) => {
+      const code = data.charCodeAt(0)
+
+      // Enter key
+      if (code === 13) {
+        term.writeln("")
+        // Mock command processing
+        if (currentLine.trim() === "clear") {
+          term.clear()
+        } else if (currentLine.trim() === "help") {
+          term.writeln("\x1b[90mAvailable commands:\x1b[0m")
+          term.writeln("  \x1b[33mclear\x1b[0m  - Clear terminal")
+          term.writeln("  \x1b[33mhelp\x1b[0m  - Show this help")
+          term.writeln("  \x1b[33mrun\x1b[0m   - Run code (mock)")
+        } else if (currentLine.trim() === "run") {
+          // Trigger runMock
+          const mockEvent = new CustomEvent("terminal-run")
+          window.dispatchEvent(mockEvent)
+        }
+        currentLine = ""
+        term.write("\x1b[36m$\x1b[0m ")
+ return
+      }
+
+      // Backspace
+      if (code === 127 || code === 8) {
+        if (currentLine.length > 0) {
+          currentLine = currentLine.slice(0, -1)
+          term.write("\b \b")
+        }
+        return
+      }
+
+      // Printable characters
+      if (code >= 32) {
+        currentLine += data
+        term.write(data)
+      }
+    })
+
     const handleResize = () => {
       fitAddon.fit()
     }
