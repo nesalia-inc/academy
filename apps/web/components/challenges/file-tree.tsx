@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { FileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react"
 import { useChallengeEditorStore } from "@/store/use-challenge-editor-store"
+import { Plus, FolderPlus } from "lucide-react"
 
 export function FileTreeComponent() {
   const { files, openFile } = useChallengeEditorStore()
@@ -39,9 +40,31 @@ export function FileTreeComponent() {
   return (
     <FileTree
       model={model}
-      header={<span className="text-xs font-medium px-2">Explorer</span>}
+      className="bg-background"
+      header={
+        <div className="flex items-center justify-between h-8 px-2 border-b">
+          <span className="text-sm font-medium text-muted-foreground">Explorer</span>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => {}}
+              className="p-1 rounded hover:bg-muted transition-colors"
+              title="New File"
+            >
+              <Plus className="size-3.5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => {}}
+              className="p-1 rounded hover:bg-muted transition-colors"
+              title="New Folder"
+            >
+              <FolderPlus className="size-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+      }
       style={{
         height: "100%",
+        "--trees-bg-override": "hsl(var(--background))",
         "--trees-selected-bg-override": "hsl(var(--accent))",
         "--trees-fg-override": "hsl(var(--foreground))",
         "--trees-border-color-override": "hsl(var(--border))",
