@@ -34,6 +34,17 @@ function isTypingTarget(target: EventTarget | null) {
   )
 }
 
+function isInsideFileTree(event: KeyboardEvent) {
+  // composedPath() includes shadow DOM nodes — if we detect any, we're in Trees shadow DOM
+  const path = event.composedPath()
+  for (const node of path) {
+    if (node instanceof Element && node.shadowRoot) {
+      return true
+    }
+  }
+  return false
+}
+
 function ThemeHotkey() {
   const { resolvedTheme, setTheme } = useTheme()
 
@@ -51,7 +62,7 @@ function ThemeHotkey() {
         return
       }
 
-      if (isTypingTarget(event.target)) {
+      if (isTypingTarget(event.target) || isInsideFileTree(event)) {
         return
       }
 

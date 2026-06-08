@@ -111,7 +111,10 @@ export default function ChallengeLayout({
               <ResizableHandle className="w-1 bg-transparent hover:bg-border rounded-md transition-all duration-200" />
 
               <ResizablePanel defaultSize={50} minSize={40}>
+                <div className="flex flex-col h-full border rounded-md">
+
                 <ChallengeEditorPanel />
+                </div>
               </ResizablePanel>
             </ResizablePanelGroup>
           </div>

@@ -1,12 +1,17 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { FileTree, useFileTree, useFileTreeSelection } from "@pierre/trees/react"
+import {
+  FileTree,
+  useFileTree,
+  useFileTreeSelection,
+  type FileTreeItem,
+} from "@pierre/trees/react"
 import { useChallengeEditorStore } from "@/store/use-challenge-editor-store"
 import { Plus, FolderPlus } from "lucide-react"
 
 export function FileTreeComponent() {
-  const { files, openFile } = useChallengeEditorStore()
+  const { files, openFile, addFile } = useChallengeEditorStore()
 
   const paths = files.map((file) => file.path)
 
@@ -14,7 +19,60 @@ export function FileTreeComponent() {
     initialExpansion: "open",
     paths,
     search: false,
+    composition: {
+      contextMenu: {
+        enabled: true,
+        triggerMode: "right-click",
+        buttonVisibility: "never",
+      },
+    },
+    renaming: {
+      onRename: ({ sourcePath, destinationPath }) => {
+        // Update file path and name in the store after rename
+        useChallengeEditorStore.setState((state) => ({
+          files: state.files.map((file) =>
+            file.path === sourcePath
+              ? {
+                  ...file,
+                  path: destinationPath,
+                  name: destinationPath.split("/").pop() ?? file.name,
+                }
+              : file
+          ),
+        }))
+      },
+    },
   })
+
+  const handleNewFile = () => {
+    const id = `file-${Date.now()}`
+    const name = "untitled.ts"
+    const path = `/src/${name}`
+    const newFile = {
+      id,
+      name,
+      path,
+      content: "",
+      language: "typescript",
+    }
+    model.add(path)
+    addFile(newFile)
+    model.startRenaming(path)
+  }
+
+  const handleDelete = (path: string) => {
+    const file = files.find((f) => f.path === path)
+    if (!file) return
+    model.remove(path)
+    useChallengeEditorStore.setState((state) => ({
+      files: state.files.filter((f) => f.id !== file.id),
+      openFileIds: state.openFileIds.filter((id) => id !== file.id),
+      activeFileId:
+        state.activeFileId === file.id
+          ? state.openFileIds.find((id) => id !== file.id) ?? null
+          : state.activeFileId,
+    }))
+  }
 
   // Get selected paths from the tree model
   const selectedPaths = useFileTreeSelection(model)
@@ -46,7 +104,7 @@ export function FileTreeComponent() {
           <span className="text-sm font-medium text-muted-foreground">Explorer</span>
           <div className="flex items-center gap-0.5">
             <button
-              onClick={() => {}}
+              onClick={handleNewFile}
               className="p-1 rounded hover:bg-muted transition-colors"
               title="New File"
             >
@@ -69,6 +127,28 @@ export function FileTreeComponent() {
         "--trees-fg-override": "hsl(var(--foreground))",
         "--trees-border-color-override": "hsl(var(--border))",
       } as React.CSSProperties}
+      renderContextMenu={(item: FileTreeItem, context) => (
+        <div className="rounded-md border bg-background p-1 shadow-md min-w-[120px]">
+          <button
+            onClick={() => {
+              context.close({ restoreFocus: false })
+              model.startRenaming(item.path)
+            }}
+            className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors"
+          >
+            Rename
+          </button>
+          <button
+            onClick={() => {
+              context.close()
+              handleDelete(item.path)
+            }}
+            className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors text-destructive"
+          >
+            Delete
+          </button>
+        </div>
+      )}
     />
   )
 }
