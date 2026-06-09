@@ -5,7 +5,6 @@ import {
   FileTree,
   useFileTree,
   useFileTreeSelection,
-  type FileTreeItem,
 } from "@pierre/trees/react"
 import { useChallengeEditorStore } from "@/store/use-challenge-editor-store"
 import { Plus, FolderPlus } from "lucide-react"
@@ -127,7 +126,7 @@ export function FileTreeComponent() {
         "--trees-fg-override": "hsl(var(--foreground))",
         "--trees-border-color-override": "hsl(var(--border))",
       } as React.CSSProperties}
-      renderContextMenu={(item: FileTreeItem, context) => (
+      renderContextMenu={(item, context) => (
         <div className="rounded-md border bg-background p-1 shadow-md min-w-[120px]">
           <button
             onClick={() => {
