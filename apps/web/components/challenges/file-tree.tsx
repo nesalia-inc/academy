@@ -22,7 +22,6 @@ export function FileTreeComponent() {
       contextMenu: {
         enabled: true,
         triggerMode: "right-click",
-        buttonVisibility: "never",
       },
     },
     renaming: {
